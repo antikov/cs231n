@@ -273,7 +273,10 @@ class FullyConnectedNet(object):
                 X, _cache['relu{}'.format(layer)] = relu_forward(batch_norm_layer)
             else:
                 X, _cache['relu{}'.format(layer)] = relu_forward(aff_layer)
-                
+
+            if self.use_dropout:
+                X, _cache['dropout{}'.format(layer)] = dropout_forward(X, self.dropout_param)
+
         W = self.params['W{}'.format(self.num_layers)]
         b = self.params['b{}'.format(self.num_layers)]
         scores, _cache['aff{}'.format(self.num_layers)] = affine_forward(X, W, b)
@@ -306,6 +309,10 @@ class FullyConnectedNet(object):
         grads['b{}'.format(self.num_layers)] = db
         
         for layer in range(self.num_layers - 1, 0, -1):
+
+            if self.use_dropout:
+                dx = dropout_backward(dx, _cache['dropout{}'.format(layer)])
+            
             dx = relu_backward(dx, _cache['relu{}'.format(layer)])
 
             if self.normalization == 'batchnorm':
