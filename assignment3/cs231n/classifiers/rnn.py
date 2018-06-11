@@ -143,15 +143,21 @@ class CaptioningRNN(object):
         f1, cache_aff = affine_forward(features, W_proj, b_proj)
         f2, cache_word = word_embedding_forward(captions_in, W_embed)
         if self.cell_type == 'rnn':
-            
             f3, cache_rnn = rnn_forward(f2, f1, Wx, Wh, b)
-            f4, cache_temp_aff = temporal_affine_forward(f3, W_vocab, b_vocab)
-            loss, dx = temporal_softmax_loss(f4, captions_out, mask)
+        if self.cell_type == 'lstm':
+            f3, cache_lstm = lstm_forward(f2, f1, Wx, Wh, b)
             
-            dx, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dx, cache_temp_aff)
+        f4, cache_temp_aff = temporal_affine_forward(f3, W_vocab, b_vocab)
+        loss, dx = temporal_softmax_loss(f4, captions_out, mask)
+            
+        dx, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dx, cache_temp_aff)
+        if self.cell_type == 'rnn':
             dx, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dx, cache_rnn)
-            grads['W_embed'] = word_embedding_backward(dx, cache_word)
-            dx, grads['W_proj'], grads['b_proj'] = affine_backward(dh0, cache_aff)
+        if self.cell_type == 'lstm':
+            dx, dh0, grads['Wx'], grads['Wh'], grads['b'] = lstm_backward(dx, cache_lstm)
+            
+        grads['W_embed'] = word_embedding_backward(dx, cache_word)
+        dx, grads['W_proj'], grads['b_proj'] = affine_backward(dh0, cache_aff)
         
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -220,14 +226,18 @@ class CaptioningRNN(object):
         prev_h, cache_aff = affine_forward(features, W_proj, b_proj)
         step = 0
         x = W_embed[self._start]
+        if self.cell_type == 'lstm':
+            prev_c = np.zeros_like(prev_h)
         
         for step in range(max_length):
-            prev_h, cache = rnn_step_forward(x, prev_h, Wx, Wh, b)
+            if self.cell_type == 'rnn':
+                prev_h, cache = rnn_step_forward(x, prev_h, Wx, Wh, b)
+            if self.cell_type == 'lstm':
+                prev_h, prev_c, cache = lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b)
             scores, cache = affine_forward(prev_h, W_vocab, b_vocab)
             _max = np.argmax(scores, axis = 1)
             captions[:, step] = _max
             x = W_embed[_max]
-        
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
